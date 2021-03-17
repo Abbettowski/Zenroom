@@ -22,12 +22,23 @@ ARCH := $(shell uname -m)
 BRANCH := $(shell git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,')
 HASH := $(shell git rev-parse --short HEAD)
 VERSION := ${ZENROOM_VERSION}+${HASH}
-CFLAGS  += -I. -I../lib/lua53/src -I../lib/milagro-crypto-c/include -Wall -Wextra
+CFLAGS  += -I. -I../lib/lua53/src -I../lib/milagro-crypto-c/build/include -I../lib/milagro-crypto-c/include -Wall -Wextra
+
+CMSIS := ../lib/cmsis
+CORTEX_M_SRC_ASM = $(CMSIS)/Device/ARM/ARMCM3/Source/GCC/startup_ARMCM3.S
+CORTEX_M_SRC_C = $(CMSIS)/Device/ARM/ARMCM3/Source/system_ARMCM3.c
+CMSIS_INCLUDE_FLAGS = -I$(CMSIS)/Device/ARM/ARMCM3/Include \
+	-I$(CMSIS)/CMSIS/Core/Include
+CORTEX_M_CFLAGS = \
+	       $(CMSIS_INCLUDE_FLAGS) \
+	       -mthumb \
+	       -nostartfiles
+		   
 SOURCES := \
 	cli.o jutils.o zenroom.o zen_error.o \
 	lua_functions.o lua_modules.o lualibs_detected.o lua_shims.o \
 	encoding.o base58.o \
-	zen_memory.o lwmem.o \
+	zen_memory.o lwmem.o mutt_sprintf.o \
 	zen_io.o zen_parse.o repl.o zen_config.o \
 	zen_octet.o zen_ecp.o zen_ecp2.o zen_big.o \
 	zen_fp12.o zen_random.o zen_hash.o \
@@ -35,6 +46,9 @@ SOURCES := \
 	zen_aes.o \
 	randombytes.o \
 	cortex_m.o
+
+cortex_m_boot.o: $(CORTEX_M_SRC_ASM)
+	${CC} ${CFLAGS} ${CORTEX_M_CFLAGS} -c $^ -o $@
 
 # js: CFLAGS += -I ${EMSCRIPTEN}/system/include/libc -DLIBRARY
 js: JSOUT ?= zenroom.js
@@ -69,9 +83,6 @@ luarock: ${SOURCES}
 redis: ${SOURCES}
 	${CC} ${CFLAGS} ${SOURCES} -o redis_zenroom.so-${ARCH}.so ${LDFLAGS} ${LDADD}
 
-python: ${SOURCES}
-	${CC} -shared ${SOURCES} zen_python.o -o _zenroom.so ${LDFLAGS} ${LDADD}
-
 go: ${SOURCES}
 	${CC} -shared ${SOURCES} zen_go.o -o libzenroomgo.so ${LDFLAGS} ${LDADD}
 
@@ -80,6 +91,10 @@ erlang: ${SOURCES} erlang.o
 
 osx: ${SOURCES}
 	${CC} ${CFLAGS} ${SOURCES} -o zenroom.command ${LDFLAGS} ${LDADD}
+
+osx-shared: ${SOURCES}
+	# Call libzenroom.so to simplify python bindings
+	${CC} ${CFLAGS} ${SOURCES} -o libzenroom-${ARCH}.so ${LDFLAGS} ${LDADD}
 
 win-exe: LDFLAGS += -static
 win-exe: ${SOURCES}
@@ -113,8 +128,8 @@ ios-lib: ${SOURCES}
 android-arm android-x86 android-aarch64 java-x86_64 java-x86 java-arm java-aarch64: ${SOURCES} zenroom_jni.o
 	${CC} ${CFLAGS} ${SOURCES} zenroom_jni.o -o zenroom.so ${LDFLAGS} ${LDADD}
 
-arm: ${SOURCES}
-	${CC} ${CFLAGS} ${SOURCES} -o zenroom.elf ${LDFLAGS} ${LDADD}
+arm: ${SOURCES} cortex_m_boot.o
+	${CC} ${CFLAGS} ${CORTEX_M_CFLAGS} ${CORTEX_M_SRC_C} ${SOURCES} cortex_m_boot.o -o zenroom.elf ${LDFLAGS} ${LDADD}
 	${OBJCOPY} -O binary zenroom.elf zenroom.bin
 
 debug: CFLAGS+= -ggdb -DDEBUG=1 -Wall

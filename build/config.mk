@@ -9,7 +9,7 @@ website := ${pwd}/docs
 luasrc := ${pwd}/lib/lua53/src
 ldadd := ${pwd}/lib/lua53/src/liblua.a
 lua_embed_opts := ""
-lua_cflags := -DLUA_COMPAT_5_3 -DLUA_COMPAT_MODULE -DLUA_COMPAT_BITLIB -I${pwd}/lib/milagro-crypto-c/include -I${pwd}/src
+lua_cflags := -DLUA_COMPAT_5_3 -DLUA_COMPAT_MODULE -DLUA_COMPAT_BITLIB -I${pwd}/lib/milagro-crypto-c/build/include -I${pwd}/src -I${pwd}/lib/milagro-crypto-c/build/include
 
 # ----------------
 # zenroom defaults
@@ -33,7 +33,7 @@ rsa_bits := ""
 ecdh_curve := SECP256K1
 ecp_curve  := BLS383
 milagro_cmake_flags := -DBUILD_SHARED_LIBS=OFF -DBUILD_PYTHON=OFF -DBUILD_DOXYGEN=OFF -DBUILD_DOCS=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXAMPLES=OFF -DWORD_SIZE=32 -DBUILD_PAILLIER=OFF -DBUILD_X509=OFF -DBUILD_WCC=OFF -DBUILD_MPIN=OFF -DAMCL_CURVE=${ecdh_curve},${ecp_curve} -DAMCL_RSA=${rsa_bits} -DCMAKE_SHARED_LIBRARY_LINK_FLAGS="" -DC99=1 -DPAIRING_FRIENDLY_BLS383='BLS' -DCOMBA=1
-milib := ${pwd}/lib/milagro-crypto-c/lib
+milib := ${pwd}/lib/milagro-crypto-c/build/lib
 ldadd += ${milib}/libamcl_curve_${ecp_curve}.a
 ldadd += ${milib}/libamcl_pairing_${ecp_curve}.a
 ldadd += ${milib}/libamcl_curve_${ecdh_curve}.a
@@ -71,16 +71,15 @@ endif
 
 ifneq (,$(findstring cortex,$(MAKECMDGOALS)))
 gcc := arm-none-eabi-gcc
-ar  := arm-none-eabi-ar
 objcopy := arm-none-eabi-objcopy
 ranlib := arm-none-eabi-ranlib
 ld := arm-none-eabi-ld
 system := Generic
 ldadd += -lm
 cflags_protection := ""
-cflags := ${cflags_protection} -DARCH_CORTEX -mcpu=cortex-m4 -mthumb -mlittle-endian -mthumb-interwork -Wstack-usage=1024 -DLIBRARY -Wno-main -ffreestanding -nostartfiles
+cflags := ${cflags_protection} -DARCH_CORTEX -mcpu=cortex-m3 -mthumb -mlittle-endian -mthumb-interwork -Wstack-usage=1024 -DLIBRARY -Wno-main -ffreestanding -nostartfiles -specs=nano.specs -specs=nosys.specs
 milagro_cmake_flags += -DCMAKE_SYSTEM_PROCESSOR="arm" -DCMAKE_CROSSCOMPILING=1 -DCMAKE_C_COMPILER_WORKS=1
-ldflags+=-mcpu=cortex-m4 -mthumb -mlittle-endian -mthumb-interwork -Wstack-usage=1024 -Wno-main -ffreestanding -T cortex_m.ld -nostartfiles -Wl,-gc-sections -ggdb
+ldflags+=-mcpu=cortex-m3 -mthumb -mlittle-endian -mthumb-interwork -Wstack-usage=1024 -Wno-main -ffreestanding -T cortex_m.ld -nostartfiles -Wl,-gc-sections -ggdb
 endif
 
 ifneq (,$(findstring riscv64,$(MAKECMDGOALS)))
@@ -121,6 +120,15 @@ endif
 ifneq (,$(findstring linux,$(MAKECMDGOALS)))
 cflags := ${cflags} -fPIC ${cflags_protection} -D'ARCH=\"LINUX\"' -DARCH_LINUX
 ldflags := -lm -lpthread
+system := Linux
+endif
+
+ifneq (,$(findstring raspi,$(MAKECMDGOALS)))
+pi := ${CROSS_PI_PATH}
+gcc := ${pi}/bin/arm-linux-gnueabihf-gcc
+ar := ${pi}/bin/arm-linux-gnueabihf-ar
+cflags := -O3 -march=armv6 -mfloat-abi=hard -mfpu=vfp -I${pi}/arm-linux-gnueabihf/include -fPIC -D'ARCH=\"LINUX\"' -DARCH_LINUX
+ldflags := -L${pi}arm-linux-gnueabihf/lib -lm -lpthread
 system := Linux
 endif
 
@@ -225,7 +233,7 @@ endif
 
 
 ifneq (,$(findstring debug,$(MAKECMDGOALS)))
-cflags += -Og -ggdb -DDEBUG=1 -Wstack-usage=4096 -Wall -Wextra -std=c99 -pedantic
+cflags := -Og -ggdb -DDEBUG=1 -Wstack-usage=4096 -Wall -Wextra -pedantic
 endif
 
 ifneq (,$(findstring profile,$(MAKECMDGOALS)))

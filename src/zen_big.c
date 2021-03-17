@@ -131,7 +131,7 @@ big* big_new(lua_State *L) {
 
 big* big_arg(lua_State *L,int n) {
 	void *ud = luaL_testudata(L, n, "zenroom.big");
-	// luaL_argcheck(L, ud != NULL, n, "big class expected");
+	luaL_argcheck(L, ud != NULL, n, "big class expected");
 	if(ud) {
 		big *b = (big*)ud;
 		if(!b->val && !b->dval) {
@@ -306,6 +306,9 @@ static int newbig(lua_State *L) {
 
 	// octet argument, import
 	octet *o = o_arg(L, 1); SAFE(o);
+	if(o->len > MODBYTES) {
+		error(L, "Import of octet to BIG limit exceeded (%u > %u bytes)", o->len, MODBYTES);
+		return 0; }
 	big *c = big_new(L); SAFE(c);
 	_octet_to_big(L, c,o);
 	return 1;
@@ -482,7 +485,6 @@ static int big_sub(lua_State *L) {
 		if(BIG_comp(l->val,r->val)<0) {
 			BIG t;
 			BIG_sub(t, r->val, l->val);
-			BIG_mod(d->val, (chunk*)CURVE_Order);
 			BIG_sub(d->val, (chunk*)CURVE_Order, t);
 		} else {
 			BIG_sub(d->val, l->val, r->val);

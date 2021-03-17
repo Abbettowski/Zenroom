@@ -1,34 +1,39 @@
-/* This file is part of Zenroom (https://zenroom.dyne.org)
- *
- * Copyright (C) 2017-2020 Dyne.org foundation
+/*
+ * This file is part of zenroom
+ * 
+ * Copyright (C) 2017-2021 Dyne.org foundation
  * designed, written and maintained by Denis Roio <jaromil@dyne.org>
- *
+ * 
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
+ * it under the terms of the GNU Affero General Public License v3.0
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
+ * 
+ * Along with this program you should have received a copy of the
+ * GNU Affero General Public License v3.0
+ * If not, see http://www.gnu.org/licenses/agpl.txt
+ * 
+ * Last modified by Denis Roio
+ * on Monday, 15th March 2021 11:50:27 pm
  */
+
+#ifndef LIBRARY
+
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <time.h>
 
-#if (defined ARCH_LINUX) || (defined ARCH_OSX) || (defined ARCH_BSD)
+// #if (defined ARCH_LINUX) || (defined ARCH_OSX) || (defined ARCH_BSD)
 #include <sys/types.h>
 #include <sys/wait.h>
-#endif
-
+// #endif
 
 #include <errno.h>
 
@@ -43,7 +48,8 @@
 
 #include <zenroom.h>
 #include <zen_memory.h>
-#ifdef ARCH_LINUX
+
+#if defined(ARCH_LINUX)
 #include <sys/prctl.h>
 #include <linux/seccomp.h>
 #include <linux/filter.h>
@@ -74,7 +80,6 @@ extern zenroom_t *Z;
 // configure seccomp activation
 extern int zconf_seccomp;
 
-#ifndef LIBRARY
 
 extern int zen_setenv(lua_State *L, char *key, char *val);
 
@@ -151,22 +156,29 @@ void load_file(char *dst, FILE *fd) {
 }
 
 static char *conffile = NULL;
-static char *scriptfile = NULL;
 static char *keysfile = NULL;
+static char *scriptfile = NULL;
 static char *datafile = NULL;
 static char *rngseed = NULL;
+static char *sideload = NULL;
+static char *sidescript = NULL;
 static char *script = NULL;
 static char *keys = NULL;
 static char *data = NULL;
 static char *introspect = NULL;
 
+// for benchmark, breaks c99 spec
+struct timespec before = {0}, after = {0};
+
 int cli_alloc_buffers() {
 	conffile = malloc(MAX_STRING);
 	scriptfile = malloc(MAX_STRING);
+	sideload = malloc(MAX_STRING);
 	keysfile = malloc(MAX_STRING);
 	datafile = malloc(MAX_STRING);
 	rngseed = malloc(MAX_STRING);
 	script = malloc(MAX_FILE);
+	sidescript = malloc(MAX_FILE);
 	keys = malloc(MAX_FILE);
 	data = malloc(MAX_FILE);
 	introspect = malloc(MAX_STRING);
@@ -176,6 +188,7 @@ int cli_alloc_buffers() {
 int cli_free_buffers() {
 	free(conffile);
 	free(scriptfile);
+	free(sidescript);
 	free(keysfile);
 	free(datafile);
 	free(rngseed);
@@ -193,12 +206,13 @@ int main(int argc, char **argv) {
 
 	cli_alloc_buffers();
 
-	const char *short_options = "hD:ic:k:a:S:pz";
+	const char *short_options = "hD:ic:k:a:l:S:pz";
 	const char *help          =
-		"Usage: zenroom [-h] [ -D scenario ] [ -i ] [ -c config ] [ -k keys ] [ -a data ] [ -S seed ] [ -p ] [ -z ] [ script.lua ]\n";
+		"Usage: zenroom [-h] [ -D scenario ] [ -i ] [ -c config ] [ -k keys ] [ -a data ] [ -S seed ] [ -p ] [ -z ] [ -l lib ] [ script.lua ]\n";
 	int pid, status, retval;
 	conffile   [0] = '\0';
 	scriptfile [0] = '\0';
+	sideload   [0] = '\0';
 	keysfile   [0] = '\0';
 	datafile   [0] = '\0';
 	rngseed    [0] = '\0';
@@ -225,6 +239,9 @@ int main(int argc, char **argv) {
 			break;
 		case 'i':
 			interactive = 1;
+			break;
+		case 'l':
+			snprintf(sideload,MAX_STRING-1,"%s",optarg);
 			break;
 		case 'k':
 			snprintf(keysfile,MAX_STRING-1,"%s",optarg);
@@ -307,6 +324,9 @@ int main(int argc, char **argv) {
 	} else
 		if(verbosity) act(NULL, "using default configuration");
 
+	// time from here
+    clock_gettime(CLOCK_MONOTONIC, &before);
+
 	// set_debug(verbosity);
 	Z = zen_init(
 			(conffile[0])?conffile:NULL,
@@ -348,6 +368,12 @@ int main(int argc, char **argv) {
 		zen_teardown(Z);
 		cli_free_buffers();
 		return EXIT_SUCCESS;
+	}
+
+	if(sideload[0]!='\0') {
+		notice(Z->lua,"Side loading library: %s",sideload);
+		load_file(sidescript, fopen(sideload,"rb"));
+		zen_exec_script(Z, sidescript);
 	}
 
 	if(scriptfile[0]!='\0') {
@@ -422,7 +448,16 @@ int main(int argc, char **argv) {
 #endif /* POSIX */
 
 	zen_teardown(Z);
+
+	{
+		// measure and report time of execution
+		clock_gettime(CLOCK_MONOTONIC, &after);
+		long musecs = (after.tv_sec - before.tv_sec) * 1000000L;
+		act(NULL,"Time used: %lu μs", ( ((after.tv_nsec - before.tv_nsec) / 1000L) + musecs) );
+	}
+
 	cli_free_buffers();
 	return EXIT_SUCCESS;
 }
-#endif
+
+#endif // LIBRARY

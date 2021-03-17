@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# output path:  ../../docs/examples/zencode_cookbook/
+# output path:  ${out}/
 
 # RNGSEED="hex:00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
@@ -9,6 +9,12 @@
 if ! test -r ../utils.sh; then
 	echo "run executable from its own directory: $0"; exit 1; fi
 . ../utils.sh
+
+is_cortexm=false
+if [[ "$1" == "cortexm" ]]; then
+	is_cortexm=true
+fi
+
 Z="`detect_zenroom_path` `detect_zenroom_conf`"
 
 ####################
@@ -22,6 +28,8 @@ Z="`detect_zenroom_path` `detect_zenroom_conf`"
 # }
 ####################
 
+out='../../docs/examples/zencode_cookbook'
+
 n=0
 
 let n=1
@@ -34,22 +42,22 @@ echo "------------------------------------------------"
 echo "   											  "
 
 
-cat <<EOF | zexe ../../docs/examples/zencode_cookbook/petitionRequest.zen -k ../../docs/examples/zencode_cookbook/credentialParticipantAggregatedCredential.json -a ../../docs/examples/zencode_cookbook/credentialIssuerVerifier.json | jq . | tee ../../docs/examples/zencode_cookbook/petitionRequest.json | jq
+cat <<EOF | zexe ${out}/petitionRequest.zen -k ${out}/credentialParticipantAggregatedCredential.json -a ${out}/credentialIssuerpublic_key.json | tee ${out}/petitionRequest.json | jq .
 # Two scenarios are needed for this script, "credential" and "petition".
 	Scenario credential: read and validate the credentials
 	Scenario petition: create the petition
 # Here I state my identity
     Given that I am known as 'Alice'
 # Here I load everything needed to proceed
-    Given I have my valid 'credential keypair'
-    Given I have my valid 'credentials'
-    Given I have a valid 'verifier' inside 'MadHatter'
+    Given I have my 'keys'
+    Given I have my 'credentials'
+    Given I have a 'issuer public key' inside 'MadHatter'
 # In the "when" phase we have the cryptographical creation of the petition
-    When I aggregate the verifiers
+    When I aggregate all the issuer public keys
     When I create the credential proof
     When I create the petition 'More privacy for all!'
 # Here we are printing out what is needed to the get the petition approved
-    Then print the 'verifiers'
+    Then print the 'issuer public key'
 	Then print the 'credential proof'
 	Then print the 'petition'
 # Here we're just printing the "uid" as string, instead of the default base64
@@ -67,17 +75,17 @@ echo "------------------------------------------------"
 echo "   											  "
 
 
-cat <<EOF | zexe ../../docs/examples/zencode_cookbook/petitionApprove.zen -k ../../docs/examples/zencode_cookbook/petitionRequest.json -a ../../docs/examples/zencode_cookbook/credentialIssuerVerifier.json | jq . | tee ../../docs/examples/zencode_cookbook/petitionApproved.json | jq
+cat <<EOF | zexe ${out}/petitionApprove.zen -k ${out}/petitionRequest.json -a ${out}/credentialIssuerpublic_key.json | tee ${out}/petitionApproved.json | jq .
 Scenario credential
 Scenario petition: approve
-    Given that I have a 'verifier' inside 'MadHatter'
+    Given that I have a 'issuer public key' inside 'MadHatter'
     Given I have a 'credential proof'
     Given I have a 'petition'
-    When I aggregate the verifiers
+    When I aggregate all the issuer public keys
     When I verify the credential proof
     When I verify the new petition to be empty
     Then print the 'petition'
-    Then print the 'verifiers'
+    Then print the 'issuer public key'
 	Then print the 'uid' as 'string' inside 'petition' 
 EOF
 
@@ -91,16 +99,17 @@ echo "------------------------------------------------"
 echo "   											  "
 
 
-cat <<EOF | zexe ../../docs/examples/zencode_cookbook/petitionSign.zen -k ../../docs/examples/zencode_cookbook/credentialParticipantAggregatedCredential.json -a ../../docs/examples/zencode_cookbook/credentialIssuerVerifier.json | jq . | tee ../../docs/examples/zencode_cookbook/petitionSignature.json | jq
+cat <<EOF | zexe ${out}/petitionSign.zen -k ${out}/credentialParticipantAggregatedCredential.json -a ${out}/credentialIssuerpublic_key.json | tee ${out}/petitionSignature.json | jq .
 Scenario credential
 Scenario petition: sign petition
     Given I am 'Alice'
-    Given I have my valid 'credential keypair'
+    Given I have my valid 'keys'
     Given I have my 'credentials'
-    Given I have a valid 'verifier' inside 'MadHatter'
-    When I aggregate the verifiers
+    Given I have a valid 'issuer public key' inside 'MadHatter'
+    When I aggregate all the issuer public keys
 	When I create the petition signature 'More privacy for all!'
     Then print the 'petition signature'
+    and print the 'issuer public key'
 EOF
 
 let n=4
@@ -118,17 +127,18 @@ echo "------------------------------------------------"
 echo "   											  "
  
 
-cat <<EOF | zexe ../../docs/examples/zencode_cookbook/petitionAggregateSignature.zen -k ../../docs/examples/zencode_cookbook/petitionApproved.json -a ../../docs/examples/zencode_cookbook/petitionSignature.json | jq . | tee ../../docs/examples/zencode_cookbook/petitionAggregatedSignature.json | jq
+cat <<EOF | zexe ${out}/petitionAggregateSignature.zen -k ${out}/petitionApproved.json -a ${out}/petitionSignature.json | tee ${out}/petitionAggregatedSignature.json | jq .
 Scenario credential
 Scenario petition: aggregate signature
-    Given that I have a valid 'petition signature'
-    Given I have a valid 'petition'
-    Given I have a valid 'verifiers'
+    Given that I have a 'petition signature'
+    Given I have a 'petition'
+    Given I have a 'issuer public key'
     When the petition signature is not a duplicate
     When the petition signature is just one more
     When I add the signature to the petition
+    and I aggregate all the issuer public keys
     Then print the 'petition'
-    Then print the 'verifiers'
+    Then print the 'issuer public key'
 EOF
 
 let n=5
@@ -141,11 +151,11 @@ echo "------------------------------------------------"
 echo "   											  "
 
 
-cat <<EOF | zexe ../../docs/examples/zencode_cookbook/petitionTally.zen -k ../../docs/examples/zencode_cookbook/credentialParticipantAggregatedCredential.json -a ../../docs/examples/zencode_cookbook/petitionAggregatedSignature.json | jq . | tee ../../docs/examples/zencode_cookbook/petitionTally.json | jq
+cat <<EOF | zexe ${out}/petitionTally.zen -k ${out}/credentialParticipantAggregatedCredential.json -a ${out}/petitionAggregatedSignature.json | tee ${out}/petitionTally.json | jq .
 Scenario credential
 Scenario petition: tally
     Given that I am 'Alice'
-    Given I have my valid 'credential keypair'
+    Given I have my 'keys'
     Given I have a valid 'petition'
     When I create a petition tally
     Then print all data
@@ -161,7 +171,7 @@ echo "------------------------------------------------"
 echo "   											  "
 
 
-cat <<EOF | zexe ../../docs/examples/zencode_cookbook/petitionCount.zen -k ../../docs/examples/zencode_cookbook/petitionTally.json -a ../../docs/examples/zencode_cookbook/petitionAggregatedSignature.json | jq . | tee ../../docs/examples/zencode_cookbook/petitionCount.json | jq
+cat <<EOF | zexe ${out}/petitionCount.zen -k ${out}/petitionTally.json -a ${out}/petitionAggregatedSignature.json | tee ${out}/petitionCount.json | jq .
 Scenario credential
 Scenario petition: count
     Given that I have a valid 'petition'

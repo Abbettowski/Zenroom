@@ -3,7 +3,7 @@ Scenario 'ecdh': load a issuer keypair
 Scenario 'credential': Create the keypair
 Given I am 'Alice'
 Given I have my 'keypair'
-Given I have my 'issuer keypair' 
+Given I have my 'keys' 
 and I have a 'public key' from 'Bob'
 and I have a 'public key' from 'Carl'
 # Load Arrays
@@ -57,11 +57,12 @@ Given I have a 'string dictionary' named 'salesReport'
 
 
 
+When I create the issuer public key
 # This prints a child of dictionary, which can be a string (like here) or another dictionary
 Then print the 'maxPricePerKG' in 'salesReport'
 
 # This prints the "verifier", that is the cryptographical object produced by an issuer that is publicly accessible
-# in order to match it to the proofs
-Then print the 'verifier' inside 'issuer keypair'
+# in order to match it with the proofs. 
+Then print the 'issuer public key' 
 
 

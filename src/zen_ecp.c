@@ -1,22 +1,25 @@
-/* This file is part of Zenroom (https://zenroom.dyne.org)
- *
- * Copyright (C) 2017-2019 Dyne.org foundation
+/*
+ * This file is part of zenroom
+ * 
+ * Copyright (C) 2017-2021 Dyne.org foundation
  * designed, written and maintained by Denis Roio <jaromil@dyne.org>
- *
+ * 
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
+ * it under the terms of the GNU Affero General Public License v3.0
+ * 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
+ * 
+ * Along with this program you should have received a copy of the
+ * GNU Affero General Public License v3.0
+ * If not, see http://www.gnu.org/licenses/agpl.txt
+ * 
+ * Last modified by Denis Roio
+ * on Tuesday, 16th March 2021 8:42:17 am
  */
+
 
 // For now, the only supported curve is BLS383 type WEIERSTRASS
 
@@ -434,6 +437,11 @@ static int ecp_get_y(lua_State *L) {
 	return 1;
 }
 
+static int ecp_prime(lua_State *L) {
+	big *p = big_dup(L,(big*)CURVE_Prime); SAFE(p);
+	return 1;
+}
+
 static int ecp_output(lua_State *L) {
 	ecp *e = ecp_arg(L,1); SAFE(e);
 	if (ECP_isinf(&e->val)) { // Infinity
@@ -463,6 +471,7 @@ int luaopen_ecp(lua_State *L) {
 		{"sub",ecp_sub},
 		{"mul",ecp_mul},
 		{"validate",ecp_validate},
+		{"prime",ecp_prime},
 		{NULL,NULL}};
 	const struct luaL_Reg ecp_methods[] = {
 		{"affine",ecp_affine},

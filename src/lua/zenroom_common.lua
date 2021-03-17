@@ -1,3 +1,22 @@
+-- This file is part of Zenroom (https://zenroom.dyne.org)
+--
+-- Copyright (C) 2018-2021 Dyne.org foundation designed, written and
+-- maintained by Denis Roio <jaromil@dyne.org>
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU Affero General Public License as
+-- published by the Free Software Foundation, either version 3 of the
+-- License, or (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful, but
+-- WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-- Affero General Public License for more details.
+--
+-- You should have received a copy of the GNU Affero General Public
+-- License along with this program.  If not, see
+-- <https://www.gnu.org/licenses/>.
+
 -- override type to recognize zenroom's types
 luatype = type
 _G['type'] = function(var)
@@ -14,6 +33,11 @@ function iszen(n)
 	  return true
    end
    return false
+end
+
+-- workaround for a ternary conditional operator
+function fif(condition, if_true, if_false)
+  if condition then return if_true else return if_false end
 end
 
 -- gets a string and returns the associated function, string and prefix
@@ -171,7 +195,7 @@ function get_format(what)
    error("Conversion format not supported: "..what, 2)
    return nil
 end
-	  
+
 -- debugging facility
 function xxx(s, n)
    n = n or 3
@@ -328,7 +352,7 @@ function isdictionary(obj)
    if luatype(obj) ~= 'table' then return 0 end -- error("Argument is not a table: "..type(obj)
    local count = 0
    for k, v in pairs(obj) do
-	  -- check that all keys are numbers
+	  -- check that all keys are not numbers
 	  -- don't check sparse ratio (cjson's lua_array_length)
 	  if luatype(k) ~= "string" then return 0 end
 	  count = count + 1
@@ -338,12 +362,11 @@ end
 
 function array_contains(arr, obj)
    assert(luatype(arr) == 'table', "Internal error: array_contains argument is not a table")
-   local res = false
-   for k, v in ipairs(obj) do
+   for k, v in pairs(arr) do
 	  assert(luatype(k) == 'number', "Internal error: array_contains argument is not an array")
-	  res = res or v == obj
+	  if v == obj then return true end
    end
-   return res
+   return false
 end
 
 
@@ -385,7 +408,8 @@ end
 function zenguard(val)
    if not (iszen(type(val)) or tonumber(val)) then
 		I.print(ZEN.heap().ACK)
-		xxx("Invalid value: "..val)
+		-- xxx("Invalid value: "..val)
+		debug_heap_dump()
 		error("Zenguard detected an invalid value in HEAP: type "..type(val), 2)
 		return nil
    end
